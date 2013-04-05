@@ -192,11 +192,11 @@ bool QExtFileInfo::createDir(const KURL& path, QWidget *window)
 {
   int i = 0;
   bool result;
-  KURL dir3; 
+  KURL dir3;
   KURL dir2;
   KURL dir1 = path;
   dir1.setPath("/");
-  if (!exists(dir1, false, window))
+  if (!exists(dir1, false, window) && path.protocol() != "webdav" )
   {
     return false; //the root is not accessible, possible wrong username/password supplied
   }
@@ -508,7 +508,7 @@ void QExtFileInfo::slotNewEntries(KIO::Job *job, const KIO::UDSEntryList& udsLis
           u.setPath(u.directory(false, true) + linkDest);
           u.cleanPath();
         }
-        else       
+        else
           u.setPath(linkDest);
         u.adjustPath(+1);
         if (!dirListItems.contains(u) && u.url() != m_listStartURL && !u.isParentOf(item->url()))
