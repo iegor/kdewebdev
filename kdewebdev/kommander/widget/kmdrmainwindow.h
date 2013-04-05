@@ -13,15 +13,16 @@
 #define KmdrMainWindow_H
 
 #include <kmainwindow.h>
+#include <kommander_export.h>
 
 /**
 	@author Andras Mantia <amantia@kdewebdev.org>
 */
-class KmdrMainWindow : public KMainWindow
+class KOMMANDER_EXPORT KmdrMainWindow : public KMainWindow
 {
 Q_OBJECT
 public:
-    KmdrMainWindow(QWidget *parent = 0, const char *name = 0, WFlags f = WType_TopLevel | WDestructiveClose);
+    KmdrMainWindow(QWidget *parent = 0, const char *name = 0, WFlags f = WType_TopLevel | WDestructiveClose) __attribute__(( visibility("default")));
 
     ~KmdrMainWindow();
 

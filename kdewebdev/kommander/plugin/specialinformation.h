@@ -23,7 +23,9 @@
 #include <qmap.h>
 #include <qpair.h>
 
-class SpecialFunction
+#include <kommander_export.h>
+
+class KOMMANDER_EXPORT SpecialFunction
 {
 public:
  
@@ -72,7 +74,7 @@ protected:
 
 
 
-class SpecialInformation
+class KOMMANDER_EXPORT SpecialInformation
 {
 public:
   SpecialInformation()  {m_defaultGroup = -1;}

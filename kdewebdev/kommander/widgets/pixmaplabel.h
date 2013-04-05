@@ -26,6 +26,7 @@
 
 /* OTHER INCLUDES */
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 #include <qlabel.h>
 
 class QWidget;

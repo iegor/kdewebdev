@@ -14,13 +14,14 @@
 
 #include <qlabel.h>
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 #include <qfont.h>
 
 /**
 	@author Andras Mantia <amantia@kdewebdev.org>
 */
-class FontDialog : public QLabel, public KommanderWidget
+class KOMMANDER_EXPORT FontDialog : public QLabel, public KommanderWidget
 {
   Q_OBJECT
   Q_PROPERTY(QString populationText READ populationText WRITE setPopulationText DESIGNABLE false)

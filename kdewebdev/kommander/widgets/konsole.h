@@ -25,6 +25,7 @@
 
 /* OTHER INCLUDES */
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 class QWidget;
 class MyProcess;

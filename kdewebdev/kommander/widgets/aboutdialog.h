@@ -14,6 +14,7 @@
 
 #include <qlabel.h>
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 class KAboutApplication;
 class KAboutData;
@@ -21,7 +22,7 @@ class KAboutData;
 /**
 	@author Andras Mantia <amantia@kdewebdev.org>
 */
-class AboutDialog : public QLabel, public KommanderWidget
+class KOMMANDER_EXPORT AboutDialog : public QLabel, public KommanderWidget
 {
   Q_OBJECT
   Q_PROPERTY(bool KommanderWidget READ isKommanderWidget)

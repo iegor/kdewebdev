@@ -14,11 +14,12 @@
 
 #include <qtoolbox.h>
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 /**
 	@author Andras Mantia <amantia@kdewebdev.org>
 */
-class ToolBox : public QToolBox, public KommanderWidget
+class KOMMANDER_EXPORT ToolBox : public QToolBox, public KommanderWidget
 {
   Q_OBJECT
   Q_PROPERTY(QString populationText READ populationText WRITE setPopulationText DESIGNABLE false)

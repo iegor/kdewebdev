@@ -22,6 +22,7 @@
 
 /* OTHER INCLUDES */
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 class QTimer;
 class KOMMANDER_EXPORT Timer : public QLabel, public KommanderWidget

@@ -15,6 +15,7 @@
 #include <qlabel.h>
 #include <qmap.h>
 #include <kommanderwidget.h>
+#include <kommander_export.h>
 
 
 class KPopupMenu;
@@ -22,7 +23,7 @@ class KPopupMenu;
 /**
 	@author Andras Mantia <amantia@kdewebdev.org>
 */
-class PopupMenu : public QLabel, public KommanderWidget
+class KOMMANDER_EXPORT PopupMenu : public QLabel, public KommanderWidget
 {
   Q_OBJECT
   Q_PROPERTY(QString populationText READ populationText WRITE setPopulationText DESIGNABLE false)
