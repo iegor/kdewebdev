@@ -116,6 +116,26 @@
       <item>array_indexedRemoveElements</item>
       <item>array_indexedInsertElements</item>
       <item>array_indexedToString</item>
+      <item>array_flipCopy</item>
+    </list>
+    
+    <list name="kmdrmatrix">
+      <item>matrix_fromString</item>
+      <item>matrix_toString</item>
+      <item>matrix_clear</item>
+      <item>matrix_rows</item>
+      <item>matrix_columnToArray</item>
+      <item>matrix_columnToIndexedArray</item>
+      <item>matrix_rowToArray</item>
+      <item>matrix_columns</item>
+      <item>matrix_rowKeys</item>
+      <item>matrix_columnKeys</item>
+      <item>matrix_removeRow</item>
+      <item>matrix_removeColumn</item>
+      <item>matrix_addRow</item>
+      <item>matrix_findRow</item>
+      <!--<item>matrix_addColumn</item>
+      <item>matrix_indexedCopy</item>-->
     </list>
     
     <list name="kmdrstring">
@@ -138,6 +158,11 @@
       <item>str_toint</item>
       <item>str_todouble</item>
       <item>str_round</item>
+      <item>str_sort</item>
+      <item>str_trim</item>
+      <item>str_padLeft</item>
+      <item>str_padRight</item>
+      <item>str_count</item>
     </list>
     
     <list name="kmdrfile">
@@ -171,6 +196,7 @@
     <list name="keywords">
       <item> else </item>
       <item> for </item>
+      <item> to </item>
       <item> function </item>
       <item> in </item>
       <item> select </item>
@@ -186,6 +212,12 @@
       <item> break </item>
       <item> continue </item>
       <item> exit </item>
+      <item> switch </item>
+      <item> and </item>
+      <item> or </item>
+      <item> not </item>
+      <item> step </item>
+      <item> with </item>
     </list>
     
     <list name="booleans">
@@ -202,6 +234,7 @@
       <!-- FindAll tries to interpret everything -->
       <context attribute="Normal Text" lineEndContext="#stay" name="FindAll">
       	<IncludeRules context="FindComments" />
+        <IncludeRules context="FindBlockComments" />
       	<IncludeRules context="FindCommands" />
 	    <IncludeRules context="FindStrings" />
 	    <IncludeRules context="FindSubstitutions" />      
@@ -212,6 +245,13 @@
       <context attribute="Normal Text" lineEndContext="#pop" name="FindComments">
         <Detect2Chars attribute="Comment" context="Comment" char="/" char1="/" firstNonSpace="true"/>
 	    <RegExpr attribute="Normal Text" context="Comment" String="[\s;](?=/)" />
+      </context>
+      <!-- FindBlockComments consumes comments to end of block -->
+      <context attribute="Normal Text" lineEndContext="#stay" name="FindBlockComments">
+        <Detect2Chars attribute="Comment" context="twolinecomment" char="/" char1="&#42;" beginRegion="Comment" />
+      </context>
+      <context name="twolinecomment" attribute="Comment" lineEndContext="#stay">
+        <Detect2Chars attribute="Comment" context="#pop" char="*" char1="/" endRegion="Comment" />
       </context>
       
       <context attribute="Comment" lineEndContext="#pop" name="Comment">
@@ -239,6 +279,7 @@
         <RegExpr attribute="Keyword" context="#stay" String="\belseif&noword;" beginRegion="if" endRegion="if"/>
         <RegExpr attribute="Keyword" context="#stay" String="\belse&noword;"  beginRegion="if" endRegion="if"/>
         <RegExpr attribute="Keyword" context="#stay" String="\bendif&noword;" endRegion="if"/>
+        <RegExpr attribute="Keyword" context="#stay" String="\}&eos;" endRegion="group"/>
       	<!-- handle case as a special case -->
         <RegExpr attribute="Keyword" context="Case" String="\bcase&noword;" beginRegion="case" />
         <!-- handle command line options -->
@@ -256,6 +297,7 @@
         <RegExpr attribute="KmdrMethod" context="DetectKmdrMethod" String="kmdrfunctions\(" />        
         <keyword attribute="DCOPMethod" context="#stay" String="kmdrfunctions" />  
         <keyword attribute="KmdrArray" context="#stay" String="kmdrarray" />      
+        <keyword attribute="KmdrMatrix" context="#stay" String="kmdrmatrix" />      
         <keyword attribute="KmdrString" context="#stay" String="kmdrstring" />        
         <keyword attribute="KmdrFile" context="#stay" String="kmdrfile" />        
         <keyword attribute="KmdrInput" context="#stay" String="kmdrinput" />        
@@ -273,6 +315,8 @@
         <DetectChar attribute="Normal Text" context="#pop" char=")" lookAhead="true"/>
         <DetectChar attribute="Normal Text" context="#pop" char="[" lookAhead="true"/>
         <DetectChar attribute="Normal Text" context="#pop" char="]" lookAhead="true"/>
+        <DetectChar attribute="Normal Text" context="#pop" char="{" lookAhead="true"/>
+        <DetectChar attribute="Normal Text" context="#pop" char="}" lookAhead="true"/>
         <DetectChar attribute="KmdrMethod" context="DetectKmdrMethod" char="." lookAhead="true"/>
         <RegExpr attribute="Normal Text" context="#pop" String="[\s\=\;\+\-\*\/\%]+" />
      
@@ -296,18 +340,18 @@
       <context attribute="Normal Text" lineEndContext="#stay" name="FindStrings">
 	<DetectChar attribute="String SingleQ" context="StringSQ" char="'" />
 	<DetectChar attribute="String DoubleQ" context="StringDQ" char="&quot;" />
-	<Detect2Chars attribute="String SingleQ" context="StringEsc" char="$" char1="'" />
-	<Detect2Chars attribute="String Transl." context="StringDQ" char="$" char1="&quot;" />
+  <!-- <Detect2Chars attribute="String SingleQ" context="StringEsc" char="$" char1="'" /> -->
+  <!-- <Detect2Chars attribute="String Transl." context="StringDQ" char="$" char1="&quot;" /> -->
       </context>
             
       <!-- FindSubstitutions goes after anything starting with $ and ` and their escapes -->
       <context attribute="Normal Text" lineEndContext="#stay" name="FindSubstitutions">
-	<RegExpr attribute="Variable" context="#stay" String="\$[*@#?$!_0-9-]" />
+        <!-- <RegExpr attribute="Variable" context="#stay" String="\$[*@#?$!_0-9-]" />
 	<RegExpr attribute="Variable" context="Subscript" String="\$&varname;\[" />
 	<RegExpr attribute="Variable" context="#stay" String="\$&varname;" />
 	<RegExpr attribute="Variable" context="#stay" String="\$\{[*@#?$!_0-9-]\}" />
 	<RegExpr attribute="Variable" context="#stay" String="\$\{#&varname;\}" />
-	<RegExpr attribute="Variable" context="#stay" String="\$\{!&varname;\*?\}" />
+  <RegExpr attribute="Variable" context="#stay" String="\$\{!&varname;\*?\}" />-->
 	<RegExpr attribute="Variable" context="VarBrace" String="\$\{&varname;" />
 	<RegExpr attribute="Variable" context="VarBrace" String="\$\{[*@#?$!_0-9-](?=[:#%/])" />
 	<StringDetect attribute="Variable" context="ExprDblParenSubst" String="$((" beginRegion="expression" />
@@ -527,6 +571,7 @@
       <itemData name="DCOPMethod" defStyleNum="dsKeyword" italic="1" color="#21E52B" />
       <itemData name="KmdrString" defStyleNum="dsKeyword" italic="1" color="#D0D000" />
       <itemData name="KmdrArray" defStyleNum="dsKeyword" italic="1" color="#C0C0FF" />
+      <itemData name="KmdrMatrix" defStyleNum="dsKeyword" italic="1" color="#5050AA" />
       <itemData name="KmdrFile" defStyleNum="dsKeyword" italic="1" color="#FF0000" />
       <itemData name="KmdrInput" defStyleNum="dsKeyword" italic="1" color="#FF8000" />
       <itemData name="KmdrMessage" defStyleNum="dsKeyword" italic="1" color="#800000" />
@@ -535,6 +580,7 @@
   <general>
     <comments>
       <comment name="singleLine" start="//"/>
+      <comment name="multiLine" start="/*" end="*/" />
     </comments>
     <keywords casesensitive="1" weakDeliminator="^%#[]$._{}:-" additionalDeliminator="`."/>
   </general>

@@ -99,6 +99,15 @@ bool Parser::setString(const QString& s)
     {
       while (start < s.length() && s[start] != '\n')
         start++;
+    }                               // enable /* */ block comments
+    else if (s[start] == '/' && start < s.length() +1 && s[start+1] == '*')
+    {
+      start += 2;
+      while (start < s.length() +1 && !(s[start] == '*' && s[start+1] == '/'))
+      {
+        start++;
+      }
+      start += 2;
     }                              // special keyword: <>
     else if (m_data->stringToKeyword(s.mid(start, 2)) <= LastRealKeyword)
     {
@@ -194,10 +203,12 @@ ParseNode Parser::parseConstant(Parse::Mode)
     }
   return p;
 }
-
+//attempting to allow assign or copy of array, so far with no joy
 ParseNode Parser::parseValue(Mode mode)
 {
   ParseNode p = next();
+  //QString p2 = QString(p.toString());
+  //qDebug("parseValue p2 = "+p2);
   if (isFunction())
     return parseFunction(mode);
   else if (isWidget())
@@ -207,6 +218,13 @@ ParseNode Parser::parseValue(Mode mode)
     if (tryKeyword(LeftBracket, CheckOnly))
     {
       QString index = parseValue(mode).toString();
+      if (tryKeyword(DoubleBracket, CheckOnly)) 
+      {//2D array "matrix"
+        QString index2 = parseValue(mode).toString();
+        tryKeyword(RightBracket);
+        QString arr = p.variableName();
+        return matrixValue(arr, index, index2);
+      }
       tryKeyword(RightBracket);
       QString arr = p.variableName();
       return arrayValue(arr, index);
@@ -242,6 +260,11 @@ ParseNode Parser::parseValue(Mode mode)
     return ParseNode(0);
   else if (tryKeyword(True, CheckOnly))
     return ParseNode(1);
+/*  else if (isArray(p2))
+  {
+    qDebug("returning array fpr p2");
+    return p2;
+  }*/
   else if (p.isKeyword())
     setError(i18n("Expected value"));
   else // single value
@@ -411,6 +434,7 @@ ParseNode Parser::parseFunction(Mode mode)
 {
   int pos = m_start;
   QString name = next().variableName();
+  //qDebug("Parsing function: "+name);
   Function f = m_data->function(name);
   m_start++;
   ParameterList params;
@@ -484,20 +508,188 @@ ParseNode Parser::parseWidget(Mode mode, const QString &widgetName)
 ParseNode Parser::parseAssignment(Mode mode)
 {
   QString var = nextVariable();
+  //qDebug("var = "+var+" Pos:"+QString::number(m_start));
   if (tryKeyword(LeftBracket, CheckOnly))
   {
     QString index = parseValue(mode).toString();
-    tryKeyword(RightBracket);
-    tryKeyword(Assign);
-    ParseNode p = parseExpression(mode);
-    if (mode == Execute)
-      setArray(var, index, p);
+    if (tryKeyword(DoubleBracket, CheckOnly)) 
+    {//2D array "matrix"
+      ParseNode p1 = next(); //move along...
+      QString index2 = parseValue(mode).toString();
+      tryKeyword(RightBracket);
+      p1 = next();
+      ParseNode p2 = matrixValue(var, index, index2);
+      if (p1.isKeyword(PlusEqual))
+      {
+        tryKeyword(PlusEqual);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+        {
+          if (p2.type() == ValueString)
+            p = QString(p2.toString() + p.toString());
+          else if (p2.type() == ValueDouble)
+            p = p2.toDouble() + p.toDouble();
+          else
+          p = p2.toInt() + p.toInt();
+          setMatrix(var, index, index2, p);
+        }
+      }
+      else if (p1.isKeyword(MinusEqual))
+      {
+        tryKeyword(MinusEqual);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+        {
+          if (p2.type() == ValueDouble)
+            p = p2.toDouble() - p.toDouble();
+          else
+            p = p2.toInt() - p.toInt();
+          setMatrix(var, index, index2, p);
+        }
+      }
+      else if (p1.isKeyword(Increment))
+      {
+        tryKeyword(Increment);
+        if (mode == Execute)
+        {
+          p2 = p2.toInt() + 1;
+          setMatrix(var, index, index2, p2);
+        }
+      }
+      else if (p1.isKeyword(Decrement))
+      {
+        tryKeyword(Decrement);
+        if (mode == Execute)
+        {
+          p2 = p2.toInt() - 1;
+          setMatrix(var, index, index2, p2);
+        }
+      }
+      else
+      {
+        tryKeyword(Assign);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+          setMatrix(var, index, index2, p);
+      }
+    }
+    else
+    {
+      tryKeyword(RightBracket);
+      ParseNode p1 = next();
+      // seems awkward and pedantic but array values are now handled like variables
+      // for special assign with oparator
+      ParseNode p2 = arrayValue(var, index);
+      if (p1.isKeyword(PlusEqual))
+      {
+        tryKeyword(PlusEqual);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+        {
+          if (p2.type() == ValueString)
+            p = QString(p2.toString() + p.toString());
+          else if (p2.type() == ValueDouble)
+            p = p2.toDouble() + p.toDouble();
+          else
+          p = p2.toInt() + p.toInt();
+          setArray(var, index, p);
+        }
+      }
+      else if (p1.isKeyword(MinusEqual))
+      {
+        tryKeyword(MinusEqual);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+        {
+          if (p2.type() == ValueDouble)
+            p = p2.toDouble() - p.toDouble();
+          else
+            p = p2.toInt() - p.toInt();
+          setArray(var, index, p);
+        }
+      }
+      else if (p1.isKeyword(Increment))
+      {
+        tryKeyword(Increment);
+        if (mode == Execute)
+        {
+          p2 = p2.toInt() + 1;
+          setArray(var, index, p2);
+        }
+      }
+      else if (p1.isKeyword(Decrement))
+      {
+        tryKeyword(Decrement);
+        if (mode == Execute)
+        {
+          p2 = p2.toInt() - 1;
+          setArray(var, index, p2);
+        }
+      }
+      else
+      {
+        tryKeyword(Assign);
+        ParseNode p = parseExpression(mode);
+        if (mode == Execute)
+          setArray(var, index, p);
+      }
+    }
   }
   else if (tryKeyword(Assign, CheckOnly))
   {
     ParseNode p = parseExpression(mode);
     if (mode == Execute)
+    {
       setVariable(var, p);
+    }
+  }
+  else if (tryKeyword(PlusEqual, CheckOnly))
+  {
+    ParseNode p = parseExpression(mode);
+    if (mode == Execute)
+    {
+      ParseNode p2 = variable(var);
+      if (p2.type() == ValueString)
+        p = QString(p2.toString() + p.toString());
+      else if (p2.type() == ValueDouble)
+        p = p2.toDouble() + p.toDouble();
+      else
+        p = p2.toInt() + p.toInt();
+      setVariable(var, p);
+    }
+  }
+  else if (tryKeyword(MinusEqual, CheckOnly))
+  {
+    ParseNode p = parseExpression(mode);
+    if (mode == Execute)
+    {
+      ParseNode p2 = variable(var);
+      if (p2.type() == ValueDouble)
+        p = p2.toDouble() - p.toDouble();
+      else
+        p = p2.toInt() - p.toInt();
+      setVariable(var, p);
+    }
+  }
+  else if (tryKeyword(Increment, CheckOnly))
+  {
+    //ParseNode p = parseExpression(mode);
+    if (mode == Execute)
+    {
+      ParseNode p = variable(var);
+      p = p.toInt() + 1;
+      setVariable(var, p);
+    }
+  }
+  else if (tryKeyword(Decrement, CheckOnly))
+  {
+    //ParseNode p = parseExpression(mode);
+    if (mode == Execute)
+    {
+      ParseNode p = variable(var);
+      p = p.toInt() - 1;
+      setVariable(var, p);
+    }
   }
   else if (tryKeyword(Dot, CheckOnly))
   {
@@ -529,11 +721,14 @@ Flow Parser::parseIf(Mode mode)
   ParseNode p = next();
   Flow flow = FlowStandard;
   bool matched = false;
+  bool thenFound = false;
   do {
     m_start++;
     Mode m = matched ? CheckOnly : mode;
     p = parseCondition(m);
-    tryKeyword(Then);
+    thenFound = tryKeyword(Then, CheckOnly);
+    if (!thenFound)
+      tryKeyword(LeftCurlyBrace);
     bool condition = !matched && p.toBool();
     if (condition)
     {
@@ -544,16 +739,37 @@ Flow Parser::parseIf(Mode mode)
     else 
       parseBlock(CheckOnly);
     matched = matched || p.toBool();
-  } while (next().isKeyword(Elseif));
+    if (!thenFound)
+      tryKeyword(RightCurlyBrace);
+  } while (nextElseIf() == true);
+  bool braceFound = false;
   if (tryKeyword(Else, CheckOnly))
   {
+    braceFound = tryKeyword(LeftCurlyBrace, CheckOnly);
     if (!matched)
       flow = parseBlock(mode);
     else
       parseBlock(CheckOnly);
   }
+  if (braceFound)
+    tryKeyword(RightCurlyBrace);
+  if (thenFound)
   tryKeyword(Endif);
   return flow;
+}
+
+bool Parser::nextElseIf()
+{
+  ParseNode p1 = next();
+  if (p1.isKeyword(Elseif))
+    return true;
+  else 
+  {
+    ParseNode p2 = next();
+    if (p1.isKeyword(Else) && p2.isKeyword(If) )
+      return true;
+  }
+  return false;
 }
 
 Parse::Flow Parser::parseWhile(Mode mode)
@@ -562,11 +778,13 @@ Parse::Flow Parser::parseWhile(Mode mode)
   int start = m_start;
   bool running = true;
   Parse::Flow flow = FlowStandard;
+  bool doFound = false;
   while (running)
   {
     m_start = start;
     ParseNode p = parseCondition(mode);
-    if (!tryKeyword(Do))
+    doFound = tryKeyword(Do, CheckOnly);
+    if (!doFound && !tryKeyword(LeftCurlyBrace))
       break;
     running = p.toBool();
     flow = parseBlock(running ? mode : CheckOnly);
@@ -575,7 +793,10 @@ Parse::Flow Parser::parseWhile(Mode mode)
   }
   if (flow != FlowExit)
   {
-    tryKeyword(End);
+    if (doFound)
+      tryKeyword(End);
+    else
+      tryKeyword(RightCurlyBrace);
     return FlowStandard;
   }
   else 
@@ -593,12 +814,25 @@ Parse::Flow Parser::parseFor(Mode mode)
   int step = 1;
   if (tryKeyword(Step, CheckOnly))
     step = parseExpression(mode).toInt();
-  tryKeyword(Do);
+
+  bool doFound = tryKeyword(Do, CheckOnly);
+  if (!doFound)
+    tryKeyword(LeftCurlyBrace);
   int block = m_start;
   Parse::Flow flow = FlowStandard;
-  if (end >= start)
+  if (end >= start && step > 0)
   {
     for (int i = start; i <= end; i+=step)
+    {
+      m_start = block;
+      setVariable(var, ParseNode(i));
+      flow = parseBlock(mode);
+      if (flow == FlowBreak || flow == FlowExit)
+        break;
+    }
+  } else if (end <= start && step < 0)
+  {
+    for (int i = start; i >= end; i+=step)
     {
       m_start = block;
       setVariable(var, ParseNode(i));
@@ -610,7 +844,10 @@ Parse::Flow Parser::parseFor(Mode mode)
     parseBlock(Parse::CheckOnly);
   if (flow != FlowExit)
   {
-    tryKeyword(End);
+    if (doFound)
+      tryKeyword(End);
+    else
+      tryKeyword(RightCurlyBrace);
     return FlowStandard;
   }
   else 
@@ -621,12 +858,22 @@ Parse::Flow Parser::parseForeach(Mode mode)
 {
   m_start++;
   QString var = nextVariable();
+  QString var2 = "";
+  bool matrixfound = tryKeyword(ArrKeyVal, CheckOnly);
+  if (matrixfound == true)
+  {
+    m_start--;
+    tryKeyword(ArrKeyVal);
+    var2 = nextVariable();
+  }
   tryKeyword(In);
   QString arr = nextVariable();
-  tryKeyword(Do);
+  bool doFound = tryKeyword(Do, CheckOnly);
+  if (!doFound)
+    tryKeyword(LeftCurlyBrace);
   int start = m_start;
   Parse::Flow flow = FlowStandard;
-  if (isArray(arr) && array(arr).count())
+  if (isArray(arr) && array(arr).count() && !matrixfound)
   {
     const QMap<QString, ParseNode> A = array(arr);
     for (QMapConstIterator<QString, ParseNode> It = A.begin(); It != A.end(); ++It)
@@ -638,11 +885,41 @@ Parse::Flow Parser::parseForeach(Mode mode)
         break;
     }
   }
+  else if  (isMatrix(arr) && matrix(arr).count() )
+  {
+    const QMap<QString, QMap<QString, ParseNode> > A = matrix(arr);
+    for (QMapConstIterator<QString, QMap<QString, ParseNode> > It = A.begin(); It != A.end(); ++It)
+    {
+      m_start = start;
+      setVariable(var, It.key());
+      if (matrixfound == true)
+      {
+        const QMap<QString, ParseNode> B = It.data();
+        for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+        {
+          m_start = start;
+          setVariable(var2, It2.key());
+          flow = parseBlock(mode);
+          if (flow == FlowBreak || flow == FlowExit)
+            break;
+        }
+      }
+      else
+      {
+        flow = parseBlock(mode);
+        if (flow == FlowBreak || flow == FlowExit)
+          break;
+      }
+    }
+  }
   else 
     parseBlock(CheckOnly);
   if (flow != FlowExit)
   {
-    tryKeyword(End);
+    if (doFound)
+      tryKeyword(End);
+    else
+      tryKeyword(RightCurlyBrace);
     return FlowStandard;
   }
   else 
@@ -655,6 +932,8 @@ void Parser::parseSwitch(Mode mode)
   QString var = nextVariable();
   ParseNode caseValue = variable(var);
   bool executed = false;
+  bool braceFound = false;
+  braceFound = tryKeyword(LeftCurlyBrace, CheckOnly);
   tryKeyword(Semicolon, CheckOnly);
   while (tryKeyword(Case, CheckOnly))
   {
@@ -666,12 +945,17 @@ void Parser::parseSwitch(Mode mode)
   }
   if (tryKeyword(Else, CheckOnly))
     parseBlock(executed ? CheckOnly : mode);
-  tryKeyword(End);
+  if (!braceFound)
+    tryKeyword(End);
+  else
+    tryKeyword(RightCurlyBrace);
 }
 
 Flow Parser::parseCommand(Mode mode)
 {
   ParseNode p = next();
+  QString p2 = p.toString();
+  //qDebug("Parsing command: "+p2);
   if (next().isKeyword(If))
     return parseIf(mode);
   else if (next().isKeyword(While))
@@ -740,7 +1024,7 @@ bool Parser::tryKeyword(Keyword k, Mode mode)
     if (k == Dot)
       setError(i18n("Expected '%1'<br><br>Possible cause of the error is having a variable with the same name as a widget").arg(m_data->keywordToString(k)));
     else
-     setError(i18n("Expected '%1'").arg(m_data->keywordToString(k)));
+     setError(i18n("Expected '%1' got '%2'.").arg(m_data->keywordToString(k)).arg(next().toString()));
   }
   return false;
 }
@@ -886,6 +1170,66 @@ ParseNode Parser::arrayValue(const QString& name, const QString& key) const
     return m_arrays[name].contains(key) ? m_arrays[name][key] : ParseNode();
 }
 
+// 2D arrays "Matrix"
+const QMap<QString, QMap<QString, ParseNode> >& Parser::matrix(const QString& name) const
+{
+  if (isGlobal(name))
+    return m_globalMatrices[name];
+  else
+    return m_matrices[name];
+}
+
+bool Parser::isMatrix(const QString& name) const
+{
+  return m_matrices.contains(name) || m_globalMatrices.contains(name);
+}
+
+void Parser::setMatrix(const QString& name, const QString& keyr, const QString& keyc, ParseNode value)
+{
+  if (isGlobal(name))
+    m_globalMatrices[name][keyr][keyc] = value;
+  else
+    m_matrices[name][keyr][keyc] = value;
+}
+
+void Parser::unsetMatrix(const QString& name, const QString& keyr, const QString& keyc)
+{
+  if (isGlobal(name))
+  {
+    if (keyr.isNull())
+      m_globalMatrices.remove(name);
+    else if (isMatrix(name))
+    {
+      if (keyc.isNull())
+        m_globalMatrices[name].remove(keyr);
+      else
+        m_globalMatrices[name][keyr].remove(keyc);
+    }
+  }
+  else
+  {
+    if (keyr.isNull())
+      m_matrices.remove(name);
+    else if (isMatrix(name))
+    {
+      if (keyc.isNull())
+        m_matrices[name].remove(keyr);
+      else
+        m_matrices[name][keyr].remove(keyc);
+    }
+  }
+}
+
+ParseNode Parser::matrixValue(const QString& name, const QString& keyr, const QString& keyc) const
+{
+  if (!isMatrix(name))
+    return ParseNode();
+  if (isGlobal(name))
+    return m_globalMatrices[name].contains(keyr) && m_globalMatrices[name][keyr].contains(keyc) ? m_globalMatrices[name][keyr][keyc] : ParseNode();
+  else
+    return m_matrices[name].contains(keyr) && m_matrices[name][keyr].contains(keyc) ? m_matrices[name][keyr][keyc] : ParseNode();
+}
+
 
 
 KommanderWidget* Parser::currentWidget() const
@@ -895,5 +1239,5 @@ KommanderWidget* Parser::currentWidget() const
 
 QMap<QString, ParseNode> Parser::m_globalVariables;
 QMap<QString, QMap<QString, ParseNode> > Parser::m_globalArrays;
-
+QMap<QString, QMap<QString, QMap<QString, ParseNode> > > Parser::m_globalMatrices;
 

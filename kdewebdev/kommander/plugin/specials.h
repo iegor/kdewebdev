@@ -23,7 +23,7 @@ existing plugins. */
 
 namespace Group
 {
-  enum {DCOP, Kommander, String, Array, File, Input, Message, Slots};
+  enum {DCOP, Kommander, String, Array, File, Input, Message, Slots, Matrix};
 }
 
 namespace DCOP
@@ -32,26 +32,31 @@ namespace DCOP
     currentItem, currentRow, execute, findItem, global, insertColumn, insertItem, insertItems, insertRow, 
     item, itemDepth, itemPath, removeColumn, removeItem, removeRow, selection, setAssociatedText, setChecked, 
     setCellText, setCurrentItem, insertTab, setColumnCaption, setEnabled, setGlobal, setMaximum, setPixmap, 
-    setRowCaption, setSelection, setText, 
-    setVisible, text, type, setCellWidget, cellWidget, setEditable, geometry, hasFocus};
+    setRowCaption, setSelection, setText, getBackgroundColor, setBackgroundColor,
+    setVisible, text, type, setCellWidget, cellWidget, setEditable, geometry, hasFocus, isModified};
 }
 
 namespace Kommander
 {
   enum {widgetText, selectedWidgetText, null, pid, dcopid, parentPid, debug,
   echo, env, exec, expr, global, i18n, dialog, readSetting, setGlobal, writeSetting, dcop,
-  switchBlock, execBegin, forBlock, forEachBlock, ifBlock, comment, createWidget, connect, disconnect, widgetExists, exit, Break, Continue, Return, execBackground};
+  switchBlock, execBegin, forBlock, forEachBlock, ifBlock, comment, createWidget, connect, disconnect, widgetExists, exit, Break, Continue, Return, execBackground, switchInternal}; //, focusWidget};
 }
 
 namespace Array
 {
-  enum {values, keys, clear, count, value, remove, setValue, fromString, toString, indexedFromString, indexedToString, indexedRemoveElements, indexedInsertElements};
+  enum {values, keys, clear, count, value, remove, setValue, fromString, toString, indexedFromString, indexedToString, indexedRemoveElements, indexedInsertElements, flipCopy};
+}
+
+namespace Matrix
+{
+  enum {fromString, toString, clear, rows, columns, rowToArray, columnToArray, columnToIndexedArray, rowKeys, columnKeys, addRow, removeRow, removeColumn, findRow};
 }
 
 namespace String
 {
   enum {length, contains, find, findRev, left, right, mid, remove, replace, upper, lower,
-  compare, isEmpty, isNumber, section, args, toInt, toDouble, round};
+  compare, isEmpty, isNumber, section, args, toInt, toDouble, round, sort, trim, padLeft, padRight, count};
 }
 
 namespace File

@@ -23,10 +23,13 @@
 #include <qevent.h>
 #include <qgroupbox.h>
 #include <qobjectlist.h>
+#include <klocale.h>
 
 /* OTHER INCLUDES */
+#include "kommanderplugin.h"
 #include <specials.h>
 #include "groupbox.h"
+
 
 GroupBox::GroupBox(QWidget *a_parent, const char *a_name)
   : QGroupBox(a_parent, a_name), KommanderWidget(this)
@@ -105,7 +108,8 @@ void GroupBox::contextMenuEvent( QContextMenuEvent * e )
 
 bool GroupBox::isFunctionSupported(int f)
 {
-  return f == DCOP::text || f == DCOP::setText;
+  return f == DCOP::text || f == DCOP::setText || f == DCOP::geometry || f == DCOP::getBackgroundColor || f == DCOP::setBackgroundColor;
+// || (f >= FirstFunction && f <= LastFunction);
 }
 
 QString GroupBox::handleDCOP(int function, const QStringList& args)
@@ -122,6 +126,22 @@ QString GroupBox::handleDCOP(int function, const QStringList& args)
     case DCOP::setText:
       setTitle(args[0]);
       break;
+    case DCOP::geometry:
+    {
+      QString geo = QString::number(this->x())+" "+QString::number(this->y())+" "+QString::number(this->width())+" "+QString::number(this->height());
+      return geo;
+      break;
+    }
+    case DCOP::getBackgroundColor:
+      return this->paletteBackgroundColor().name();
+      break;
+    case DCOP::setBackgroundColor:
+    {
+      QColor color;
+      color.setNamedColor(args[0]);
+      this->setPaletteBackgroundColor(color);
+      break;
+    }
     default:
       return KommanderWidget::handleDCOP(function, args);
   }

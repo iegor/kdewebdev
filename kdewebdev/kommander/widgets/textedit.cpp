@@ -29,7 +29,16 @@
 
 enum Functions {
   FirstFunction = 450, //CHANGE THIS NUMBER TO AN UNIQUE ONE!!!
-  TE_isModified,
+  TE_setModified,
+  TE_selectText,
+  TE_paragraphs,
+  TE_length,
+//  TE_getCursorPosition,
+  TE_paragraphLength,
+  TE_linesOfParagraph,
+  TE_findText,
+  TE_VAsuperScript,
+  TE_VAnormalScript,
   LastFunction
 };
 
@@ -44,7 +53,17 @@ KommanderWidget((QObject *) this)
   connect(this, SIGNAL(textChanged()), this, SLOT(setTextChanged()));
 
   KommanderPlugin::setDefaultGroup(Group::DCOP);
-  KommanderPlugin::registerFunction(TE_isModified, "isModified(QString widget)",  i18n("see if widget has been modified."), 1);
+  KommanderPlugin::registerFunction(TE_setModified, "setModified(QString widget, bool Modified)",  i18n("Set widget modified status."), 1);
+  KommanderPlugin::registerFunction(TE_selectText, "selectText(QString widget, int paraFrom, int indexFrom, int paraTo, int indexTo)",  i18n("Select a block of text using the paragraph number and character index of the line. You can use the cursorPositionChanged(int, int) signal to get this data in real time into a script."), 5);
+  KommanderPlugin::registerFunction(TE_findText, "findText(QString widget, QString Text, bool Case-Sensitive, bool Forward)",  i18n("Search for text from the cursor or a specified position. You can specifiy case sensitive search and forward or backward."), 5);
+//  KommanderPlugin::registerFunction(TE_findText, "findText(QString widget, QString Text, bool Case-Sensitive, bool Forward, int Paragraph, int Index)",  i18n("Search for text from the cursor or a specified position. You can specifiy case sensitive search and forward or backward."), 5, 7);
+  KommanderPlugin::registerFunction(TE_paragraphs, "paragraphs(QString widget)",  i18n("Get the number of paragraphs in the widget."), 1);
+  KommanderPlugin::registerFunction(TE_length, "length(QString widget)",  i18n("Get the total length of all text."), 1);
+//  KommanderPlugin::registerFunction(TE_getCursorPosition, "getCursorPosition(QString widget)",  i18n("Get the cursor postion in the form of paragraph and postion integers."), 1);
+  KommanderPlugin::registerFunction(TE_paragraphLength, "paragraphLength(QString widget, int Paragraph)",  i18n("Get the length of the paragraph."), 2);
+  KommanderPlugin::registerFunction(TE_linesOfParagraph, "linesOfParagraph(QString widget, int Paragraph)",  i18n("Get the number of lines in the paragraph."), 2);
+  KommanderPlugin::registerFunction(TE_VAsuperScript, "setSuperScript(QString widget)",  i18n("Use to set superscript."), 1);
+  KommanderPlugin::registerFunction(TE_VAnormalScript, "setNormalScript(QString widget)",  i18n("Use to revert from superscript to normal script."), 1);
 }
 
 QString TextEdit::currentState() const
@@ -124,7 +143,7 @@ void TextEdit::contextMenuEvent( QContextMenuEvent * e )
 
 bool TextEdit::isFunctionSupported(int f)
 {
-  return f == DCOP::text || f == DCOP::setText || f == DCOP::selection || f == DCOP::setSelection || f == DCOP::clear || f == DCOP::setEditable || f == DCOP::geometry || f == DCOP::hasFocus || (f >= FirstFunction && f <= LastFunction);
+  return f == DCOP::text || f == DCOP::setText || f == DCOP::selection || f == DCOP::setSelection || f == DCOP::clear || f == DCOP::setEditable || f == DCOP::geometry || f == DCOP::hasFocus || f == DCOP::getBackgroundColor || f == DCOP::setBackgroundColor || f == DCOP::isModified || (f >= FirstFunction && f <= LastFunction);
 }
 
 QString TextEdit::handleDCOP(int function, const QStringList& args)
@@ -146,8 +165,50 @@ QString TextEdit::handleDCOP(int function, const QStringList& args)
     case DCOP::setEditable:
       setReadOnly(args[0] == "false" || args[0] == "0");
       break;
-    case TE_isModified:
+    case DCOP::getBackgroundColor:
+      return this->paletteBackgroundColor().name();
+      break;
+    case DCOP::setBackgroundColor:
+    {
+      QColor color;
+      color.setNamedColor(args[0]);
+      this->setPaletteBackgroundColor(color);
+      break;
+    }
+    case DCOP::isModified:
       return isModified() ? "1" : "0";
+      break;
+    case TE_setModified:
+      this->setModified(args[0].toInt());
+      break;
+    case TE_selectText:
+      QTextEdit::setSelection(args[0].toInt(), args[1].toInt(), args[2].toInt(), args[3].toInt());
+      break;
+    case TE_length:
+      return QString::number(QTextEdit::length() );
+      break;
+    /*case TE_getCursorPosition:
+      return QString::number(QTextEdit::getCursorPosition() );
+      break;*/
+    case TE_paragraphLength:
+      return QString::number(QTextEdit::paragraphLength(args[0].toInt() ) );
+      break;
+    case TE_linesOfParagraph:
+      return QString::number(QTextEdit::linesOfParagraph(args[0].toInt() ) );
+      break;
+    case TE_findText:
+    {
+//      int para = args[3].toInt();
+//      int idx = args[4].toInt();
+//      return QString::number(QTextEdit::find(args[0], args[1].toUInt(), false, args[2].toUInt(), para, idx ));
+      return QString::number(QTextEdit::find(args[0], args[1].toUInt(), false ));
+      break;
+    }
+    case TE_VAsuperScript:
+      break;
+      QTextEdit::setVerticalAlignment(AlignSuperScript);
+    case TE_VAnormalScript:
+      QTextEdit::setVerticalAlignment(AlignNormal);
       break;
     case DCOP::geometry:
     {

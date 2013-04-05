@@ -41,6 +41,8 @@ enum Functions {
   TBL_setColumnReadOnly,
   TBL_setRowReadOnly,
   TBL_rowCount,
+  TBL_colHeader,
+  TBL_rowHeader,
   LastFunction
 };
 
@@ -61,6 +63,8 @@ Table::Table(QWidget *a_parent, const char *a_name)
   KommanderPlugin::registerFunction(TBL_setColumnReadOnly, "setColumnReadOnly(QString widget, int col, bool Readonly)", i18n("Set the column read only using zero based index.<br /><b>Not guaranteed to have KDE4 compatiblility</b>"), 3);
   KommanderPlugin::registerFunction(TBL_setRowReadOnly, "setRowReadOnly(QString widget, int row, bool Readonly)", i18n("Set the row read only using zero based index.<br /><b>Not guaranteed to have KDE4 compatiblility</b>"), 3);
   KommanderPlugin::registerFunction(TBL_rowCount, "rowCount(QString widget)", i18n("Returns the number of rows of the table"), 1);
+  KommanderPlugin::registerFunction(TBL_colHeader, "columnHeader(QString widget, int Column)", i18n("Returns the text of the header for the column index"), 2);
+  KommanderPlugin::registerFunction(TBL_rowHeader, "rowHeader(QString widget, int Row)", i18n("Returns the text of the header for the row index"), 2);
 
 }
 
@@ -119,7 +123,7 @@ bool Table::isFunctionSupported(int f)
   return f == DCOP::currentColumn || f == DCOP::currentRow || f == DCOP::insertColumn || 
       f == DCOP::insertRow || f == DCOP::cellText || f == DCOP::setCellText || f == DCOP::setCellWidget || f == DCOP::cellWidget || f == DCOP::columnCount ||
       f == DCOP::removeRow || f == DCOP::removeColumn || f == DCOP::setColumnCaption ||
-      f == DCOP::setRowCaption || f == DCOP::text || f == DCOP::setText || f == DCOP::selection || f == DCOP::geometry || f == DCOP::hasFocus  || (f >= FirstFunction && f <= LastFunction);
+      f == DCOP::setRowCaption || f == DCOP::text || f == DCOP::setText || f == DCOP::selection || f == DCOP::geometry || f == DCOP::hasFocus || f == DCOP::getBackgroundColor || f == DCOP::setBackgroundColor  || (f >= FirstFunction && f <= LastFunction);
 }
 
 void Table::setCellWidget(int row, int col, const QString & _widgetName)
@@ -180,15 +184,16 @@ void Table::contextMenuEvent( QContextMenuEvent * e )
   QPoint p = e->globalPos();
   emit contextMenuRequested(p.x(), p.y());
 }
-/*
-void Table::adjustColumn(int col)
+
+void Table::columnClicked(int col)
 {
-  if (numRows() >= col)
-    QTable::adjustColumn(col);
-  else
-    KMessageBox::error(this, "Attempted to size nonexistant column");
+  emit columnHeaderClicked(col);
+  static bool ascending = TRUE;
+  if (!sorting()) return;
+  ascending=!ascending;
+  sortColumn( col, ascending, TRUE);
 }
-*/
+
 QString Table::handleDCOP(int function, const QStringList& args)
 {
   switch (function) 
@@ -293,27 +298,62 @@ QString Table::handleDCOP(int function, const QStringList& args)
     case DCOP::selection:
       return selectedArea();
       break;
+    case DCOP::getBackgroundColor:
+      return this->paletteBackgroundColor().name();
+      break;
+    case DCOP::setBackgroundColor:
+    {
+      QColor color;
+      color.setNamedColor(args[0]);
+      this->setPaletteBackgroundColor(color);
+      break;
+    }
     case TBL_sortColumnExtra:
-      QTable::sortColumn(args[0].toInt(), args[1].toInt(), args[2].toInt());
+      if (numCols() >= args[0].toInt())
+        QTable::sortColumn(args[0].toInt(), args[1].toInt(), args[2].toInt());
       break;
     case TBL_keepCellVisible:
-      QTable::ensureCellVisible(args[0].toInt()-1, args[1].toInt()-1);
+      if (numRows() >= args[0].toInt() && numCols() >+ args[1].toInt())
+        QTable::ensureCellVisible(args[0].toInt()-1, args[1].toInt()-1);
       break;
     case   TBL_selectCells:
-      QTable::selectCells (args[0].toInt(), args[1].toInt(), args[2].toInt(), args[3].toInt());
+      if (numRows() >= args[0].toInt() && numCols() >+ args[1].toInt() && numRows() >= args[2].toInt() && numCols() >+ args[3].toInt())
+        QTable::selectCells (args[0].toInt(), args[1].toInt(), args[2].toInt(), args[3].toInt());
       break;
     case TBL_selectRow:
-      QTable::selectRow (args[0].toInt());
+      if (numRows() >= args[0].toInt())
+        QTable::selectRow (args[0].toInt());
       break;
     case TBL_selectColumn:
-      QTable::selectColumn (args[0].toInt());
+      if (numCols() >= args[0].toInt())
+        QTable::selectColumn (args[0].toInt());
       break;
     case TBL_setColumnReadOnly:
-      QTable::setColumnReadOnly (args[0].toInt(), args[1].toUInt());
+      if (numCols() >= args[0].toInt())
+        QTable::setColumnReadOnly (args[0].toInt(), args[1].toUInt());
       break;
     case TBL_setRowReadOnly:
-      QTable::setRowReadOnly (args[0].toInt(), args[1].toUInt());
+      if (numRows() >= args[0].toInt())
+        QTable::setRowReadOnly (args[0].toInt(), args[1].toUInt());
       break;
+    case TBL_colHeader:
+    {
+      QHeader* hdr = QTable::horizontalHeader();
+      if (numCols() >= args[0].toInt())
+        return hdr->label(args[0].toInt());
+      else
+        return "No column at index "+args[0];
+      break;
+    }
+    case TBL_rowHeader:
+    {
+      QHeader* hdr = QTable::verticalHeader();
+      if (numRows() >= args[0].toInt())
+        return hdr->label(args[0].toInt());
+      else
+        return "No row at index "+args[0];
+      break;
+    }
     case DCOP::geometry:
     {
       QString geo = QString::number(this->x())+" "+QString::number(this->y())+" "+QString::number(this->width())+" "+QString::number(this->height());

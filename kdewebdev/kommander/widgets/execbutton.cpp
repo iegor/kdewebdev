@@ -25,6 +25,9 @@
 #include <qstring.h>
 #include <qstringlist.h>
 #include <qwidget.h>
+#include <qpopupmenu.h>
+#include <qapplication.h>
+#include <qwidgetlist.h>
 
 /* OTHER INCLUDES */
 #include <kommanderwidget.h>
@@ -32,8 +35,17 @@
 #include "execbutton.h"
 #include <myprocess.h>
 #include <iostream>
+#include <kommanderplugin.h>
 
 using namespace std;
+
+enum Functions {
+  FirstFunction = 260, //CHANGE THIS NUMBER TO AN UNIQUE ONE!!!
+  EB_isOn,
+  EB_setPopup,
+  EB_setButtonText,
+  LastFunction
+};
 
 ExecButton::ExecButton(QWidget* a_parent, const char* a_name)
   : KPushButton(a_parent, a_name), KommanderWidget(this)
@@ -45,6 +57,11 @@ ExecButton::ExecButton(QWidget* a_parent, const char* a_name)
   setWriteStdout(true);
   setBlockGUI(Button);
   connect(this, SIGNAL(clicked()), this, SLOT(startProcess()));
+  
+  KommanderPlugin::setDefaultGroup(Group::DCOP);
+  KommanderPlugin::registerFunction(EB_isOn, "isOn(QString widget)",  i18n("For use only when button is togle type."), 1);
+  KommanderPlugin::registerFunction(EB_setPopup, "setPopup(QString widget, QString Menu)",  i18n("Associate a Kommander PopupMenu with this ExecButton."), 2);
+  KommanderPlugin::registerFunction(EB_setButtonText, "setButtonText(QString widget, QString Text)",  i18n("Set the text on the ExecButton."), 2);
 }
 
 ExecButton::~ExecButton()
@@ -154,9 +171,16 @@ void ExecButton::showEvent(QShowEvent* e)
   emit widgetOpened();
 }
 
+void ExecButton::contextMenuEvent( QContextMenuEvent * e )
+{
+  e->accept();
+  QPoint p = e->globalPos();
+  emit contextMenuRequested(p.x(), p.y());
+}
+
 bool ExecButton::isFunctionSupported(int f)
 {
-  return f == DCOP::text || f == DCOP::setText || f == DCOP::execute || f == DCOP::geometry;
+  return f == DCOP::text || f == DCOP::setText || f == DCOP::execute || f == DCOP::geometry || f == DCOP::getBackgroundColor || f == DCOP::setBackgroundColor || (f >= FirstFunction && f <= LastFunction);
 }
 
 QString ExecButton::handleDCOP(int function, const QStringList& args)
@@ -170,10 +194,41 @@ QString ExecButton::handleDCOP(int function, const QStringList& args)
     case DCOP::execute:
       startProcess();
       break;
+    case EB_isOn:
+      return QString::number(this->isOn() );
+      break;
+    case EB_setButtonText:
+      ExecButton::setText(args[0]);
+      break;
+    case EB_setPopup:
+    {
+      QWidgetList  *list = QApplication::allWidgets();
+      QWidgetListIt it( *list );
+      QWidget * w;
+      while ( (w=it.current()) != 0 ) {  // for each widget...
+        ++it;
+        if (w->name() == args[0] && w->className() == "PopupMenu")
+        {
+          QPopupMenu *popup = dynamic_cast<QPopupMenu*>(w->child("unnamed", "KPopupMenu"));
+          this->setPopup(popup);
+        }
+      }
+      break;
+    }
     case DCOP::geometry:
     {
       QString geo = QString::number(this->x())+" "+QString::number(this->y())+" "+QString::number(this->width())+" "+QString::number(this->height());
       return geo;
+      break;
+    }
+    case DCOP::getBackgroundColor:
+      return this->paletteBackgroundColor().name();
+      break;
+    case DCOP::setBackgroundColor:
+    {
+      QColor color;
+      color.setNamedColor(args[0]);
+      this->setPaletteBackgroundColor(color);
       break;
     }
     default:

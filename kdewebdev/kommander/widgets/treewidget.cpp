@@ -48,6 +48,9 @@
 enum Functions {
   FirstFunction = 189,
   SelectedIndexes,
+  TW_childCount,
+  TW_setOpen,
+  TW_isOpen,
   LastFunction
 };
 
@@ -68,6 +71,9 @@ TreeWidget::TreeWidget(QWidget *a_parent, const char *a_name)
   KommanderPlugin::registerFunction(colCaption, "columnCaption(QString widget, int column)", i18n("Get the column caption for column index"), 2);
   KommanderPlugin::registerFunction(setColWidth, "setColWidth(QString widget, int column, int width)", i18n("Set the pixel width for column index - use 0 to hide"), 3);
   KommanderPlugin::registerFunction(setColAlignment, "setColumnAlignment(QString widget, int column, QString Alignment)", i18n("Set to <i>left</i>, <i>right</i> or <i>center</i>, case insensitive "), 3);
+  KommanderPlugin::registerFunction(TW_childCount, "childCount(QString widget)", i18n("Get the count of top level items."), 1);
+  KommanderPlugin::registerFunction(TW_setOpen, "setOpen(QString widget, int Index, bool Open)", i18n("Expand or collapse a node."), 3);
+  KommanderPlugin::registerFunction(TW_isOpen, "isOpen(QString widget, int Index)", i18n("See if node is open or closed."), 2);
 }
 
 TreeWidget::~TreeWidget()
@@ -142,6 +148,21 @@ QListViewItem* TreeWidget::itemFromString(QListViewItem* parent, const QString& 
 }
 
 int TreeWidget::itemToIndex(QListViewItem* item)
+{
+//  if (!item->isSelected())
+//    return -1;
+  QListViewItemIterator it(this);
+  int index = 0;
+  while (it.current()) {
+    if (it.current() == item)
+      return index;
+    ++it;
+    ++index;
+  }
+  return -1;
+}
+
+int TreeWidget::itemToIndexSafe(QListViewItem* item)
 {
   QListViewItemIterator it(this);
   int index = 0;
@@ -286,7 +307,7 @@ bool TreeWidget::isFunctionSupported(int f)
   return f == DCOP::insertItem || f == DCOP::text || f == DCOP::setText || f == DCOP::insertItems ||
     f == DCOP::selection || f == DCOP::setSelection || f == DCOP::clear || f == DCOP::removeItem || 
     f == DCOP::currentItem || f == DCOP::setCurrentItem || f == DCOP::findItem || f == DCOP::item || 
-      f == DCOP::itemPath || f == DCOP::itemDepth || f == DCOP::setPixmap || f == DCOP::setColumnCaption || f == DCOP::removeColumn || f == DCOP::columnCount || f == DCOP::geometry || f == DCOP::hasFocus  || (f > FirstFunction && f < LastFunction) || (f >= TW_FUNCTION && f <= TW_LAST_FUNCTION);
+      f == DCOP::itemPath || f == DCOP::itemDepth || f == DCOP::setPixmap || f == DCOP::setColumnCaption || f == DCOP::removeColumn || f == DCOP::columnCount || f == DCOP::geometry || f == DCOP::hasFocus || f == DCOP::getBackgroundColor || f == DCOP::setBackgroundColor  || (f > FirstFunction && f < LastFunction) || (f >= TW_FUNCTION && f <= TW_LAST_FUNCTION);
 }
 
 QString TreeWidget::handleDCOP(int function, const QStringList& args)
@@ -307,6 +328,12 @@ QString TreeWidget::handleDCOP(int function, const QStringList& args)
         addItemFromString(*it);
       break;
     }
+    case TW_setOpen:
+      setOpen(indexToItem(args[0].toInt()), args[1].toInt());
+      break;
+    case TW_isOpen:
+      return QString::number(isOpen(indexToItem(args[0].toInt())));
+      break;
     case SelectedIndexes:
     {
       QString selection = "";
@@ -315,7 +342,7 @@ QString TreeWidget::handleDCOP(int function, const QStringList& args)
       {
         if (it.current()->isSelected())
         {        
-          selection.append(QString("%1\n").arg(itemToIndex(it.current())));
+          selection.append(QString("%1\n").arg(itemToIndexSafe(it.current())));
         }
         ++it;
       }
@@ -362,28 +389,33 @@ QString TreeWidget::handleDCOP(int function, const QStringList& args)
       m_lastPath.clear();
       break;
     case DCOP::removeItem:
-      delete indexToItem(args[0].toInt());
-      m_lastPath.clear();
+    {
+      if (args[0].toInt() >= 0 )
+      {
+        delete indexToItem(args[0].toInt());
+        m_lastPath.clear();
+      }
       break;
+    }
     case DCOP::currentItem:
-      return QString::number(itemToIndex(currentItem()));
+      return QString::number(itemToIndexSafe(currentItem()));
       break;
     case DCOP::setCurrentItem:
       setCurrentItem(indexToItem(args[0].toInt()));
       break;
     case DCOP::findItem:
       if (!args[1])
-        return QString::number(itemToIndex(findItem(args[0], 0)));
+        return QString::number(itemToIndexSafe(findItem(args[0], 0)));
       else
       {
         if (args[2].toUInt() && args[3].toUInt())
-          return QString::number(itemToIndex(findItem(args[0], args[1].toInt())));
+          return QString::number(itemToIndexSafe(findItem(args[0], args[1].toInt())));
         else if (args[2].toUInt())
-          return QString::number(itemToIndex(findItem(args[0], args[1].toInt(), Qt::CaseSensitive | Qt::Contains)));
+          return QString::number(itemToIndexSafe(findItem(args[0], args[1].toInt(), Qt::CaseSensitive | Qt::Contains)));
         else if (args[3].toUInt())
-          return QString::number(itemToIndex(findItem(args[0], args[1].toInt(), Qt::ExactMatch)));
+          return QString::number(itemToIndexSafe(findItem(args[0], args[1].toInt(), Qt::ExactMatch)));
         else
-          return QString::number(itemToIndex(findItem(args[0], args[1].toInt(), Qt::Contains)));
+          return QString::number(itemToIndexSafe(findItem(args[0], args[1].toInt(), Qt::Contains)));
       }
       break;
     case DCOP::item:
@@ -415,6 +447,16 @@ QString TreeWidget::handleDCOP(int function, const QStringList& args)
       if (columns() >= args[0].toInt())
         setColumnText(args[0].toInt(), args[1]);
       break;
+    case DCOP::getBackgroundColor:
+      return this->paletteBackgroundColor().name();
+      break;
+    case DCOP::setBackgroundColor:
+    {
+      QColor color;
+      color.setNamedColor(args[0]);
+      this->setPaletteBackgroundColor(color);
+      break;
+    }
     case addColumnTree:
       return QString::number(KListView::addColumn(args[0], args[1].toInt()));
       break;
@@ -449,6 +491,9 @@ QString TreeWidget::handleDCOP(int function, const QStringList& args)
       }
       break;
     }  
+    case TW_childCount:
+      return QString::number(childCount());
+      break;
     case DCOP::geometry:
     {
       QString geo = QString::number(this->x())+" "+QString::number(this->y())+" "+QString::number(this->width())+" "+QString::number(this->height());

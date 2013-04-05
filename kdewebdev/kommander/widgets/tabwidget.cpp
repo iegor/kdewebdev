@@ -23,6 +23,7 @@
 #include <qstringlist.h>
 #include <qevent.h>
 #include <qtabwidget.h>
+#include <qtabbar.h>
 
 /* OTHER INCLUDES */
 #include <kommanderwidget.h>
@@ -31,8 +32,14 @@
 #include "tabwidget.h"
 
 enum Functions {
-  FirstFunction = 355,
+  FirstFunction = 357,
   TAB_setTabIcon,
+  TAB_tabLabel,
+  TAB_isTabEnabled,
+  TAB_setTabEnabled,
+  TAB_showTabBar,
+  TAB_setCurrentPage,
+  TAB_setTabLabel,
   LastFunction
 };
 
@@ -46,6 +53,12 @@ TabWidget::TabWidget(QWidget *a_parent, const char *a_name, int a_flags)
 
   KommanderPlugin::setDefaultGroup(Group::DCOP);
   KommanderPlugin::registerFunction(TAB_setTabIcon, "setTabIcon(QString widget, int Tab, QString Icon)", i18n("Sets an icon on the specified tab. Index is zero based."), 3);
+  KommanderPlugin::registerFunction(TAB_tabLabel, "tabLabel(QString widget, int Tab)", i18n("Returns the tab label at the given index. Index is zero based."), 2);
+  KommanderPlugin::registerFunction(TAB_isTabEnabled, "isTabEnabled(QString widget, int Tab)", i18n("Returns true if tab at specified index is enabled, otherwise returns false."), 2);
+  KommanderPlugin::registerFunction(TAB_setTabEnabled, "setTabEnabled(QString widget, int Tab, bool Enabled)", i18n("Sets the tab at the given index to enabled or disabled."), 3);
+  KommanderPlugin::registerFunction(TAB_showTabBar, "showTabBar(QString widget, bool Show)", i18n("Show or hide the tabs on the tab widget."), 2);
+  KommanderPlugin::registerFunction(TAB_setCurrentPage, "setCurrentPage(QString widget, QString Page)", i18n("Set the current page by name."), 2);
+  KommanderPlugin::registerFunction(TAB_setTabLabel, "setTabLabel(QString widget, int Tab, QString Text)", i18n("Sets the tab tab label."), 3);
 }
 
 TabWidget::~TabWidget()
@@ -115,10 +128,61 @@ QString TabWidget::handleDCOP(int function, const QStringList& args)
     case DCOP::insertTab:
       insertTab(0L, args[0], args[1].toUInt());
       break;
+    case TAB_tabLabel:
+    {
+      QString s = this->label(args[0].toInt());
+      return s.remove("&");
+      break;
+    }
     case TAB_setTabIcon:
     {
       QWidget *w = page(args[0].toInt());
       setTabIconSet(w, KGlobal::iconLoader()->loadIcon(args[1], KIcon::NoGroup, KIcon::SizeMedium));
+      break;
+    }
+    case TAB_isTabEnabled:
+    {
+      QWidget *w = page(args[0].toInt());
+      return QString::number(this->isTabEnabled(w));
+      break;
+    }
+    case TAB_setTabLabel:
+    {
+      QWidget *w = page(args[0].toInt());
+      setTabLabel(w, args[1]);
+      break;
+    }
+    case TAB_setTabEnabled:
+    {
+      QWidget *w = page(args[0].toInt());
+      this->setTabEnabled(w, args[1].toInt());
+     break;
+    }
+    case TAB_setCurrentPage:
+    {
+      int cnt = this->count();
+      int i = 0;
+      bool found = false;
+      while (i < cnt) {
+        QString s = this->label(i);
+        if (s.remove("&") == args[0])
+        {
+          setCurrentPage(i);
+          found = true;
+          break;
+        }
+        i++;
+      }
+      return QString::number(found);
+      break;
+    }
+    case TAB_showTabBar:
+    {
+      QTabBar *t = this->tabBar();
+      if (args[0].toInt() == 1)
+        t->show();
+      else
+        t->hide();
       break;
     }
     default:

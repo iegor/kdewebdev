@@ -80,6 +80,18 @@ static ParseNode f_stringFindRev(Parser*, const ParameterList& params)
     params.count() == 3 ? params[2].toInt() : params[0].toString().length());
 }
 
+static ParseNode f_stringCount(Parser*, const ParameterList& params)
+{
+  int c = 0;
+  int s = 0;
+  while (params[0].toString().find(params[1].toString(), s) > -1)
+  {
+    s = params[0].toString().find(params[1].toString(), s) + 1;
+    c++;
+  }
+  return c;
+}
+
 static ParseNode f_stringLeft(Parser*, const ParameterList& params)
 {
   return params[0].toString().left(params[1].toInt());
@@ -118,6 +130,44 @@ static ParseNode f_stringUpper(Parser*, const ParameterList& params)
 static ParseNode f_stringIsEmpty(Parser*, const ParameterList& params)
 {
   return params[0].toString().isEmpty();
+}
+
+static ParseNode f_stringSort(Parser*, const ParameterList& params)
+{
+  if (params.count() == 2 ) 
+  {
+    QStringList tmplst = QStringList::split(params[1].toString(), params[0].toString());
+    tmplst.sort();
+    return tmplst.join(params[1].toString());
+  } 
+  else 
+  {
+    QStringList tmplst = QStringList::split("\n", params[0].toString());
+    tmplst.sort();
+    return tmplst.join("\n");
+  }
+}
+static ParseNode f_stringTrim(Parser*, const ParameterList& params)
+{
+  return params[0].toString().stripWhiteSpace();
+}
+
+static ParseNode f_stringPadLeft(Parser*, const ParameterList& params)
+{
+  if (params.count() == 2 ) 
+    return params[0].toString().rightJustify(params[1].toInt(), ' ', false);
+  QString s = params[2].toString();
+  QChar ch = s.at(0);
+  return params[0].toString().rightJustify(params[1].toInt(), ch, false);
+}
+
+static ParseNode f_stringPadRight(Parser*, const ParameterList& params)
+{
+  if (params.count() == 2 ) 
+    return params[0].toString().leftJustify(params[1].toInt(), ' ', false);
+  QString s = params[2].toString();
+  QChar ch = s.at(0);
+  return params[0].toString().leftJustify(params[1].toInt(), ch, false);
 }
 
 static ParseNode f_stringSection(Parser*, const ParameterList& params)
@@ -553,7 +603,7 @@ static ParseNode f_arrayValues(Parser* P, const ParameterList& params)
 
 static ParseNode f_arrayRemove(Parser* P, const ParameterList& params)
 {
-  if (!P->isArray(params[0].toString()))
+  if (P->isArray(params[0].toString()))
     P->unsetArray(params[0].toString(), params[1].toString());
   return ParseNode();
 }
@@ -697,6 +747,429 @@ static ParseNode f_arrayIndexedInsertElements(Parser* P, const ParameterList& pa
   return ParseNode();
 }
 
+static ParseNode f_arrayFlipCopy(Parser* P, const ParameterList& params) 
+{
+  QString name = params[0].toString();
+  if (!P->isArray(name))
+    return ParseNode();
+  QString arr = params[1].toString();
+  const QMap<QString, ParseNode> A = P->array(name);
+  for (QMapConstIterator<QString, ParseNode> It = A.begin(); It != A.end(); ++It )
+  {
+    P->setArray(arr, (*It).toString(), It.key() );
+  }
+  return ParseNode();
+}
+
+/*********** matrix (2D array) functions ********/
+static ParseNode f_matrixClear(Parser* P, const ParameterList& params)
+{
+  P->unsetMatrix(params[0].toString());
+  return ParseNode();
+}
+
+static ParseNode f_matrixToString(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  QString matrix;
+  QString colhead;
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  int r = 0;
+  int c = 0;
+  int frow = 0;
+  int fcol = 0;
+  if (params.count() >= 1)
+    frow = params[1].toInt(); //row headings
+  if (params.count() >= 2)
+    fcol = params[2].toInt(); //col headings
+  QString tmp;
+  typedef QMap<int, QString> col_map;
+  col_map col_head;
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1 )
+  {
+    const QMap<QString, ParseNode> B = It1.data();
+    for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+    {
+      bool colfound = false;
+      for (QMapConstIterator<int, QString> It3 = col_head.begin(); It3 != col_head.end(); ++It3 )
+      {
+        if (It2.key() == (*It3))
+        {
+          colfound = true;
+          break;
+        }
+      }
+      if (!colfound)
+      {
+        col_head[c] = It2.key();
+        if (c > 0)
+          colhead.append("\t");
+        colhead.append(It2.key());
+        c++;
+      }
+    }
+  }
+  if (fcol && frow)
+    colhead.prepend("\t");
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1)
+  {
+    if (r > 0 )
+      matrix.append("\n");
+    if (frow) //add row keys
+    {
+      tmp = It1.key();
+      matrix.append(tmp+"\t");
+    }
+    c = 0;
+    const QMap<int, QString> B = col_head;
+    for (QMapConstIterator<int, QString> It2 = B.begin(); It2 != B.end(); ++It2 )
+    {
+      if (c > 0)
+        matrix.append("\t");
+      matrix.append(P->matrixValue(name, It1.key(), (*It2) ).toString());
+      c++;
+    }
+    r++;
+  }
+  if (fcol)
+    matrix.prepend(colhead+"\n");
+  return matrix;
+}
+
+static ParseNode f_matrixFromString(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  QStringList rows = QStringList::split("\n", params[1].toString());
+  int r = 0;
+  int frow = 0;
+  int fcol = 0;
+  QString rkey;
+  QMap<int, QString> colhead;
+  if (params.count() > 1)
+    frow = params[2].toInt(); //row headings
+  if (params.count() > 2)
+    fcol = params[3].toInt(); //col headings
+  for (QStringList::Iterator itr = rows.begin(); itr != rows.end(); ++itr ) 
+  {
+    int c = 0;
+    QString ckey;
+    QStringList cols = QStringList::split("\t", (*itr), true);
+    for (QStringList::Iterator itc = cols.begin(); itc != cols.end(); ++itc )
+    {
+      QString val = (*itc).stripWhiteSpace();
+      if (frow)
+      {
+        if (c == 0 && !val.isEmpty())
+        {
+          rkey = val;
+        }
+      }
+      else if (fcol)
+        rkey = QString::number(r-1);
+      else
+        rkey = QString::number(r);
+      if (fcol && r == 0 && c >= 0)
+      {
+        if (!val.isEmpty())
+          colhead[c] = val;
+        else
+          colhead[c] = QString::number(c);
+      }
+      if (!val.isEmpty() && !(c == 0 && frow) && !(r == 0 && fcol))
+      {
+        if (fcol)
+          ckey = colhead[c];
+        else
+          ckey = QString::number(c);
+        P->setMatrix(name, rkey, ckey, val);
+      }
+      c++;
+    }
+    r++;
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixRows(Parser* P, const ParameterList& params)
+{
+  if (P->isMatrix(params[0].toString()))
+    return (uint)(P->matrix(params[0].toString()).count());
+  else
+    return (uint)0;
+  
+}
+
+static ParseNode f_matrixRowKeys(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  QString matrix;
+  QString tmp;
+  QString separator = "\t";
+  if (params.count() == 2)
+    separator = params[1].toString();
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  int r = 0;
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1)
+  {
+    if (r > 0 )
+      matrix.append(separator);
+    tmp = It1.key();
+    matrix.append(tmp);
+    r++;
+  }
+  return matrix;
+}
+
+static ParseNode f_matrixFindRow(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  QString col = params[1].toString();
+  QString val = params[2].toString();
+  QString tmp;
+  int i = 0;
+  int find;
+  if (params.count() == 4)
+    find = params[3].toInt();
+  else
+    find = 0;
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It = A.begin(); It != A.end(); ++It)
+  {
+    if (val == P->matrixValue(name, It.key(), col).toString())
+    {
+      if (find == i)
+        return It.key();
+      i++;
+    }
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixCols(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (P->isMatrix(name))
+  {
+    typedef QMap<int, QString> col_map;
+    col_map col_head;
+    uint cols = 0;
+    const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+    for (QMapConstIterator<QString, QMap<QString, ParseNode> > It = A.begin(); It != A.end(); ++It)
+    {
+      const QMap<QString, ParseNode> B = It.data();
+      for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+      {
+        bool colfound = false;
+        for (QMapConstIterator<int, QString> It3 = col_head.begin(); It3 != col_head.end(); ++It3 )
+        {
+          if (It2.key() == (*It3))
+          {
+            colfound = true;
+            break;
+          }
+        }
+        if (!colfound)
+        {
+          col_head[cols] = It2.key();
+          cols++;
+        }
+      }
+    }
+    return (uint)cols;
+  }
+  else
+    return (uint)0;
+}
+
+static ParseNode f_matrixColumnKeys(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  QString matrix;
+  QString tmp;
+  QString separator = "\t";
+  if (params.count() == 2)
+    separator = params[1].toString();
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  QStringList colnames;
+  int c =0;
+  
+  typedef QMap<int, QString> col_map;
+  col_map col_head;
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1 )
+  {
+    const QMap<QString, ParseNode> B = It1.data();
+    for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+    {
+      bool colfound = false;
+      for (QMapConstIterator<int, QString> It3 = col_head.begin(); It3 != col_head.end(); ++It3 )
+      {
+        if (It2.key() == (*It3))
+        {
+          colfound = true;
+          break;
+        }
+      }
+      if (!colfound)
+      {
+        col_head[c] = It2.key();
+        if (c > 0)
+          matrix.append(separator);
+        matrix.append(It2.key());
+        c++;
+      }
+    }
+  }
+  return matrix;
+}
+
+static ParseNode f_matrixRowToArray(Parser* P, const ParameterList& params)
+{
+  QString mtr = params[0].toString();
+  if (P->isMatrix(mtr))
+  {
+    const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(mtr);
+    int i = 0;
+    int rclear = 1;
+    int ridx = 1;
+    if (params.count() > 2)
+      rclear = params[3].toInt();
+    if (params.count() > 3)
+      ridx = params[4].toInt();
+    QString arr = params[2].toString();
+    if (rclear)
+      P->unsetArray(arr);
+    for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1)
+    {
+      if (It1.key() == params[1].toString() ) 
+      {
+        const QMap<QString, ParseNode> B = It1.data();
+        for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+        {
+          if (ridx)
+            P->setArray(arr, QString::number(i), (*It2));
+          else
+            P->setArray(arr, It2.key(), (*It2));
+          i++;
+        }
+      }
+    }
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixColumnToArray(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (P->isMatrix(name))
+  {
+    const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+    for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1)
+    {
+      const QMap<QString, ParseNode> B = It1.data();
+      for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+      {
+        if (It2.key() == params[1].toString() ) 
+        {
+          P->setArray(params[2].toString(), It1.key(), (*It2));
+        }
+      }
+    }
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixColumnToIndexedArray(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (P->isMatrix(name))
+  {
+    const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+    int i = 0;
+    for (QMapConstIterator<QString, QMap<QString, ParseNode> > It1 = A.begin(); It1 != A.end(); ++It1)
+    {
+      const QMap<QString, ParseNode> B = It1.data();
+      for (QMapConstIterator<QString, ParseNode> It2 = B.begin(); It2 != B.end(); ++It2 )
+      {
+        if (It2.key() == params[1].toString() ) 
+        {
+          P->setArray(params[2].toString(), QString::number(i), (*It2));
+          i++;
+        }
+      }
+    }
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixAddRow(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  QString rowkey = params[1].toString();
+  QStringList rows = QStringList::split("\n", params[2].toString());
+  for (QStringList::Iterator itr = rows.begin(); itr != rows.end(); ++itr ) 
+  {
+    QStringList cols = QStringList::split("\t", (*itr));
+    if (cols.count() != 2 )
+      continue;
+    QStringList::Iterator itc = cols.begin();
+    QString rkey = (*itc).stripWhiteSpace();
+    ++itc;
+    QString rval = (*itc).stripWhiteSpace();
+    if (!rkey.isEmpty() && !rval.isEmpty())
+      P->setMatrix(name, rowkey, rkey, rval);
+  }
+  return ParseNode();
+}
+
+static ParseNode f_matrixRemoveRow(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  QString rowkey = params[1].toString();
+  int found = 0;
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  if (A.contains(rowkey))
+  {
+    P->unsetMatrix(name, rowkey);
+    found = 1;
+  }
+  return QString::number(found);
+}
+/*
+static ParseNode f_matrixAddColumn(Parser* P, const ParameterList& params)
+{
+}
+*/
+static ParseNode f_matrixRemoveColumn(Parser* P, const ParameterList& params)
+{
+  QString name = params[0].toString();
+  QString colkey = params[1].toString();
+  if (!P->isMatrix(name))
+    return ParseNode();
+  int found = 0;
+  const QMap<QString, QMap<QString, ParseNode> > A = P->matrix(name);
+  for (QMapConstIterator<QString, QMap<QString, ParseNode> > It = A.begin(); It != A.end(); ++It)
+  {
+    if (A[It.key()].contains(colkey))
+      found = 1;
+    P->unsetMatrix(name, It.key(), colkey);
+  }
+  return QString::number(found);
+}
+/*
+static ParseNode f_matrixIndexedCopy(Parser* P, const ParameterList& params)
+{
+}
+*/
 /********** input functions *********************/
 static ParseNode f_inputColor(Parser*, const ParameterList& params)
 {
@@ -793,7 +1266,7 @@ static ParseNode f_message_info(Parser*, const ParameterList& params)
   if (params.count() > 1)
     caption = params[1].toString();
   KMessageBox::information(0, text, caption);
-  return ParseNode();
+  return 1;
 }
 
 static ParseNode f_message_error(Parser*, const ParameterList& params)
@@ -804,7 +1277,7 @@ static ParseNode f_message_error(Parser*, const ParameterList& params)
   if (params.count() > 1)
     caption = params[1].toString();
   KMessageBox::error(0, text, caption);
-  return ParseNode();
+  return 1;
 }
 
 static ParseNode f_message_warning(Parser*, const ParameterList& params)
@@ -915,6 +1388,7 @@ void ParserData::registerStandardFunctions()
   registerFunction("str_find", Function(&f_stringFind, ValueInt, ValueString, ValueString, ValueInt, 2));
   registerFunction("str_findrev", Function(&f_stringFindRev, ValueInt, ValueString, ValueString, ValueInt, 2));
   registerFunction("str_left", Function(&f_stringLeft, ValueString, ValueString, ValueInt));
+  registerFunction("str_count", Function(&f_stringCount, ValueInt, ValueString, ValueString));
   registerFunction("str_right", Function(&f_stringRight, ValueString, ValueString, ValueInt));
   registerFunction("str_mid", Function(&f_stringMid, ValueString, ValueString, ValueInt, ValueInt, 2));
   registerFunction("str_remove", Function(&f_stringRemove, ValueString, ValueString, ValueString));
@@ -928,6 +1402,10 @@ void ParserData::registerStandardFunctions()
   registerFunction("str_toint", Function(&f_stringToInt, ValueString, ValueInt, 1));
   registerFunction("str_todouble", Function(&f_stringToDouble, ValueString, ValueDouble, 1));
   registerFunction("str_round", Function(&f_stringRound, ValueInt, ValueDouble, ValueInt, 2));
+  registerFunction("str_sort", Function(&f_stringSort, ValueString, ValueString, ValueString, 1, 2));
+  registerFunction("str_trim", Function(&f_stringTrim, ValueString, ValueString, 1));
+  registerFunction("str_padLeft", Function(&f_stringPadLeft, ValueString, ValueInt, ValueString, ValueString, 1, 2));
+  registerFunction("str_padRight", Function(&f_stringPadRight, ValueString, ValueInt, ValueString, ValueString, 1, 2));
   registerFunction("return", Function(&f_return, ValueNone, ValueString, 1, 1));
   registerFunction("debug", Function(&f_debug, ValueNone, ValueString, 1, 100));
   registerFunction("echo", Function(&f_echo, ValueNone, ValueString, 1, 100));
@@ -963,19 +1441,35 @@ void ParserData::registerStandardFunctions()
   registerFunction("array_indexedRemoveElements", Function(&f_arrayIndexedRemoveElements, ValueNone, ValueString, ValueInt, ValueInt, 2 , 3));
   registerFunction("array_indexedInsertElements", Function(&f_arrayIndexedInsertElements, ValueNone, ValueString, ValueInt, ValueString, ValueString, 3, 4));
   registerFunction("array_remove", Function(&f_arrayRemove, ValueNone, ValueString, ValueString));
+  registerFunction("matrix_fromString", Function(&f_matrixFromString, ValueNone, ValueString, ValueString, ValueInt, ValueInt, 2, 4));
+  registerFunction("matrix_toString", Function(&f_matrixToString, ValueNone, ValueString, ValueInt, ValueInt, 1, 3));
+  registerFunction("matrix_clear", Function(&f_matrixClear, ValueNone, ValueString));
+  registerFunction("matrix_rows", Function(&f_matrixRows, ValueInt, ValueString));
+  registerFunction("matrix_columns", Function(&f_matrixCols, ValueInt, ValueString));
+  registerFunction("matrix_rowToArray", Function(&f_matrixRowToArray, ValueNone, ValueString, ValueInt, ValueString, ValueInt, ValueInt, 3, 5));
+  registerFunction("matrix_columnToArray", Function(&f_matrixColumnToArray, ValueNone, ValueString, ValueString, ValueString, 3, 3));
+  registerFunction("matrix_columnToIndexedArray", Function(&f_matrixColumnToIndexedArray, ValueNone, ValueString, ValueString, ValueString, 3, 3));
+  registerFunction("array_flipCopy", Function(&f_arrayFlipCopy, ValueNone, ValueString, ValueString, 2, 2));
+  registerFunction("matrix_rowKeys", Function(&f_matrixRowKeys, ValueString, ValueString, ValueString, 1, 2));
+  registerFunction("matrix_columnKeys", Function(&f_matrixColumnKeys, ValueString, ValueString, ValueString, 1, 2));
+  registerFunction("matrix_addRow", Function(&f_matrixAddRow, ValueNone, ValueString, ValueString, ValueString, 3, 3));
+  registerFunction("matrix_removeRow", Function(&f_matrixRemoveRow, ValueInt, ValueString, ValueString, 2, 2));
+  registerFunction("matrix_removeColumn", Function(&f_matrixRemoveColumn, ValueInt, ValueString, ValueString, 2, 2));
+  registerFunction("matrix_findRow", Function(&f_matrixFindRow, ValueString, ValueString, ValueString, ValueString, 3, 4));
+  
   registerFunction("input_color", Function(&f_inputColor, ValueString, ValueString, 0));
   registerFunction("input_text", Function(&f_inputText, ValueString, ValueString, ValueString, ValueString, 2));
   registerFunction("input_password", Function(&f_inputPassword, ValueString, ValueString, ValueString, 1));
   registerFunction("input_value", Function(&f_inputValue, ValueInt, ValueString, ValueString, ValueInt, ValueInt, 
-                   ValueInt, ValueInt, 5));
+                   ValueInt, ValueInt, 6));
   registerFunction("input_double", Function(&f_inputValueDouble, ValueDouble, ValueString, ValueString, ValueDouble, ValueDouble, 
-                   ValueDouble, ValueDouble, 5));
+                   ValueDouble, ValueDouble, 6));
   registerFunction("input_openfile", Function(&f_inputOpenFile, ValueString, ValueString, ValueString, ValueString, 0));
   registerFunction("input_openfiles", Function(&f_inputOpenFiles, ValueString, ValueString, ValueString, ValueString, 0));
   registerFunction("input_savefile", Function(&f_inputSaveFile, ValueString, ValueString, ValueString, ValueString, 0));
   registerFunction("input_directory", Function(&f_inputDirectory, ValueString, ValueString, ValueString, 0));
-  registerFunction("message_info", Function(&f_message_info, ValueNone, ValueString, ValueString, 1));
-  registerFunction("message_error", Function(&f_message_error, ValueNone, ValueString, ValueString, 1));
+  registerFunction("message_info", Function(&f_message_info, ValueInt, ValueString, ValueString, 1));
+  registerFunction("message_error", Function(&f_message_error, ValueInt, ValueString, ValueString, 1));
   registerFunction("message_warning", Function(&f_message_warning, ValueInt, ValueString, ValueString, 
                    ValueString, ValueString, ValueString, 1));
   registerFunction("message_question", Function(&f_message_question, ValueInt, ValueString, ValueString, 

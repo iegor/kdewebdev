@@ -379,6 +379,12 @@ void SpecialInformation::registerSpecials()
      i18n("Return the widget's geometry as <i>x y w h</i>. This is useful for positioning a created widget."), 1);
   insertInternal(DCOP::hasFocus, "hasFocus(QString widget)", 
      i18n("Returns true if the widget has focus."), 1);
+  insertInternal(DCOP::getBackgroundColor, "getBackgroundColor(QString widget)", 
+      i18n("Gets the widget's background color."), 1);
+  insertInternal(DCOP::setBackgroundColor, "setBackgroundColor(QString widget, QString Color)", 
+      i18n("Sets the widget's background color. Colors can be by name, like blue, or in hex like #0000ff for blue. Use the color dialog or a color picker if unsure."), 2);
+  insertInternal(DCOP::isModified, "isModified(QString widget)",
+      i18n("See if widget has been modified."), 1);
 
   insertGroup(Group::Slots, i18n("Slots"), "");
 
@@ -442,7 +448,9 @@ void SpecialInformation::registerSpecials()
      i18n("Connects the signal of sender with the slot of the receiver"), 4);
   insertInternal(Kommander::disconnect, "disconnect(QString sender, QString signal, QString receiver, QString slot)",
      i18n("Disconnects the signal of sender from the slot of the receiver"), 4);
-
+/*  insertInternal(Kommander::switchInternal, "switch(QString Variable)",
+     i18n("Can use can use <br>switch var<br>case 1<br> //code<br>else<br> //code<br>end<p>also can use the form of <br>switch var {<br>case 1; //code<br>else; code<br>}<p> semicolons are optional in place of returns. Currently switch does not parse value from arrays.") );
+*/
   insertInternal(Kommander::exit, "exit", 
      i18n("Exits script execution and returns"), 0);
   insertInternal(Kommander::Break, "break", 
@@ -480,7 +488,38 @@ void SpecialInformation::registerSpecials()
     i18n( "Remove keyNum elements starting with keyStart from an indexed array and reindex the array. If keyNum is not specified, remove only the keyStart element."), 2, 3);
   insertInternal(Array::indexedInsertElements, "indexedInsertElements(QString array, int key, QString string, QString separator)", 
     i18n( "Insert the elements from string starting at key and reindex the array. Use the separator to separate the elements from the string. The separator's default value is '\\t'."), 3, 4);
+  insertInternal(Array::flipCopy, "flipCopy(QString Array, QString Copy)",
+    i18n("Create a flipped copy of the array where the keys and values switch places. NOTE: If the values are not unique they will be overwritten as keys! Set the name of the array to copy to and go. Useful with combos and lists were you have an index, a key and a value for data purposes."), 2, 2);
 
+  insertGroup(Group::Matrix, "Matrix", "matrix");
+  insertInternal(Matrix::fromString, "fromString(QString matrix, QString String, bool With-Row-Keys, bool With-Col-Keys)", 
+    i18n("Create a 2D array with zero based integer keys. Rows seperated with returns or \\n and columns with tabs or \\t. You can then read and alter values with \"name[0][1]\".<br><b>NOTE: Watch keys!</b> The row and column keys when set to true will read respectively the first row and first column as headings. If for instance you set one where there is no column or row heading to read it will read data, and if the data is not unique you will have missing columns or rows as well as addressing not working."), 2, 4);
+  insertInternal(Matrix::toString, "toString(QString matrix, bool RowHeadings, bool ColHeadings)",
+    i18n("Convert 2D array to string, optionaly with row and column headings. If written without values set it will default to no headings."), 1, 3);
+  insertInternal(Matrix::rows, "rows(QString matrix)",
+    i18n("Return the number of rows in the matrix"), 1);
+  insertInternal(Matrix::columns, "columns(QString matrix)",
+    i18n("Return the number of columns in the matrix"), 1);
+  insertInternal(Matrix::clear, "clear(QString matrix)",
+    i18n("Clear the entire matrix"), 1);
+  insertInternal(Matrix::rowToArray, "rowToArray(QString matrix, QString Row, QString Array, bool Clear-First, bool Indexed)",
+    i18n("Convert row to array. Useful break out rows of data to work with. If you want to avoid spurious data Clear-First will wipe the array before filling it. If you choose indexed it will use a zero based index. Otherwise it will use the column keys."), 3, 5);
+  insertInternal(Matrix::columnToArray, "columnToArray(QString matrix, QString Column, QString Array)",
+    i18n("Copy a column of a Matrix to an array and optionally clear array first to avoid spurious data in loops"), 3);
+  insertInternal(Matrix::columnToIndexedArray, "columnToIndexedArray(QString matrix, QString Column, QString Array)",
+    i18n("Copy a column of a Matrix to an indexed array"), 3);
+  insertInternal(Matrix::rowKeys, "rowKeys(QString Matrix, QString Seperator)",
+    i18n("Return the row keys from the matrix. Separator defaults to [tab] \"\\t\" if left empty"), 1, 2);
+  insertInternal(Matrix::columnKeys, "columnKeys(QString Matrix, QString Seperator)",
+    i18n("Return the column keys from the matrix. Separator defaults to [tab] \"\\t\" if left empty"), 1, 2);
+  insertInternal(Matrix::addRow, "addRow(QString Matrix, QString RowKey, QString data)",
+    i18n("Add a row to the matrix. Specifiy the row key and format the data as column key [tab] column value on each line using key\\tval\\nkey\\tval format"), 3);
+  insertInternal(Matrix::removeRow, "removeRow(QString Matrix, QString RowKey)",
+    i18n("Remove a row from the matrix by key name. Returns true if key is found."), 2);
+  insertInternal(Matrix::removeColumn, "removeColumn(QString Matrix, QString ColKey)",
+    i18n("Remove a column from the matrix by key name. Returns true if key is found."), 2);
+  insertInternal(Matrix::findRow, "findRow(QString Matrix, QString Col-Key, QString Col-Value, int Iteration)",
+    i18n("Find the row key that matches a column value. Use this for unique key searches. Iteration may be omitted and the default is to return the first instance. In a loop it will return sequential finds until there are no more, in which case it returns null."), 3, 4);
 
   insertGroup(Group::String, "String", "str");
   insert(String::length, "length(QString string)", 
@@ -490,7 +529,9 @@ void SpecialInformation::registerSpecials()
   insert(String::find, "find(QString string, QString sought, int index)", 
     i18n("Returns the position of a substring in the string, or -1 if it is not found."), 2);
   insert(String::findRev, "findRev(QString string, QString sought, int index)", 
-         i18n("Returns the position of a substring in the string, or -1 if it is not found. String is searched backwards"), 2);
+    i18n("Returns the position of a substring in the string, or -1 if it is not found. String is searched backwards"), 2);
+  insertInternal(String::count, "count(QString String, QString substring)",
+    i18n("Returns the count of a given substring in the given string."), 2);
   insert(String::left, "left(QString string, int n)", 
     i18n("Returns the first <i>n</i> chars of the string."), 2);
   insert(String::right, "right(QString string, int n)", 
@@ -518,6 +559,14 @@ void SpecialInformation::registerSpecials()
     i18n("Returns the given string with %1, %2, %3 replaced with <i>arg1</i>, <i>arg2</i>, <i>arg3</i> accordingly."), 2);
   insert(String::round, "round(QString Number, int Digits)", 
     i18n("Round a floating point number by x digits."), 2);
+  insertInternal(String::sort, "sort(QString String, QString Separator)", 
+    i18n("Sort a string list. Only first paramter is required. Default separator is a newline."), 1, 2);
+  insertInternal(String::trim, "trim(QString String)", 
+    i18n("Strips white space from beginning and end of string."), 1);
+  insertInternal(String::padLeft, "padLeft(QString String, int Length, QString Pad)", 
+    i18n("Pads the string to the total length indicated. if no pad character is given spaces will be used. Try this with 0 on integer sequences and read them with str_toint."), 1, 2);
+  insertInternal(String::padRight, "padRight(QString String, int Length, QString Pad)", 
+    i18n("Pads the string to the total length indicated. if no pad character is given spaces will be used."), 1, 2);
 
   insertInternal(String::toInt, "toint(QString string, QString default)",
     i18n("Convert a string to an integer. If not possible use the default value"), 1, 2);
@@ -543,7 +592,7 @@ void SpecialInformation::registerSpecials()
   insert(Input::value, "value(QString caption, QString label, int value, int min, int max, int step)", 
          i18n("Shows value selection dialog. Returns entered value."), 5);
   insert(Input::valueDouble, "double(QString caption, QString label, double value, double min, double max, double step)", 
-         i18n("Shows float value selection dialog. Returns entered value."), 5);
+         i18n("Shows float value selection dialog. Returns entered value."), 6);
   insert(Input::openfile, "openfile(QString startdir, QString filter, QString caption)", 
          i18n("Shows existing file selection dialog. Returns selected file."), 0);
   insert(Input::savefile, "savefile(QString startdir, QString filter, QString caption)", 
@@ -555,9 +604,9 @@ void SpecialInformation::registerSpecials()
   
   insertGroup(Group::Message, "Message", "message");
   insert(Message::info, "info(QString text, QString caption)", 
-         i18n("Shows an information dialog."), 1);
+         i18n("Shows an information dialog. Returns true when clicked so you can check for user response."), 1);
   insert(Message::error, "error(QString text, QString caption)", 
-         i18n("Shows an error dialog."), 1);
+         i18n("Shows an error dialog. Returns true when clicked so you can check for user response."), 1);
   insert(Message::warning, "warning(QString text, QString caption, QString button1, QString button2, QString button3)",
          i18n("Shows a warning dialog with up to three buttons. Returns number of selected button."), 1);
   insert(Message::question, "question(QString text, QString caption, QString button1, QString button2, QString button3)",
